@@ -185,7 +185,7 @@ def notify_openclaw(session: Session, ctx: NotifyContext) -> None:
             client.tools_invoke(
                 "sessions_send",
                 {"sessionKey": sk, "message": message},
-                timeout_s=3.0,
+                timeout_s=15.0,
             )
         except Exception:
             logger.exception("notify_openclaw: sessions_send failed")
