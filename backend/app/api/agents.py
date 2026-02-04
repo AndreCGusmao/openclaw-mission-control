@@ -9,7 +9,7 @@ from sqlalchemy import update
 from sqlmodel import Session, col, select
 
 from app.api.deps import ActorContext, require_admin_auth, require_admin_or_agent
-from app.core.agent_tokens import generate_agent_token, hash_agent_token, verify_agent_token
+from app.core.agent_tokens import generate_agent_token, hash_agent_token
 from app.core.auth import AuthContext
 from app.db.session import get_session
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
@@ -20,17 +20,15 @@ from app.models.boards import Board
 from app.models.gateways import Gateway
 from app.schemas.agents import (
     AgentCreate,
-    AgentDeleteConfirm,
     AgentHeartbeat,
     AgentHeartbeatCreate,
-    AgentProvisionConfirm,
     AgentRead,
     AgentUpdate,
 )
 from app.services.activity_log import record_activity
 from app.services.agent_provisioning import (
     DEFAULT_HEARTBEAT_CONFIG,
-    cleanup_agent_direct,
+    cleanup_agent,
     provision_agent,
 )
 
@@ -139,15 +137,6 @@ def _record_instruction_failure(session: Session, agent: Agent, error: str, acti
         session,
         event_type=f"agent.{action}.failed",
         message=f"{action_label} message failed: {error}",
-        agent_id=agent.id,
-    )
-
-
-def _record_wakeup_failure(session: Session, agent: Agent, error: str) -> None:
-    record_activity(
-        session,
-        event_type="agent.wakeup.failed",
-        message=f"Wakeup message failed: {error}",
         agent_id=agent.id,
     )
 
@@ -522,15 +511,13 @@ def delete_agent(
     agent = session.get(Agent, agent_id)
     if agent is None:
         return {"ok": True}
-    if agent.status == "deleting" and agent.delete_confirm_token_hash:
-        return {"ok": True}
 
     board = _require_board(session, str(agent.board_id) if agent.board_id else None)
-    gateway, _ = _require_gateway(session, board)
+    gateway, client_config = _require_gateway(session, board)
     try:
         import asyncio
 
-        asyncio.run(cleanup_agent_direct(agent, gateway, delete_workspace=True))
+        workspace_path = asyncio.run(cleanup_agent(agent, gateway))
     except OpenClawGatewayError as exc:
         _record_instruction_failure(session, agent, str(exc), "delete")
         session.commit()
@@ -559,99 +546,34 @@ def delete_agent(
     )
     session.delete(agent)
     session.commit()
-    return {"ok": True}
 
-
-@router.post("/{agent_id}/provision/confirm")
-def confirm_provision_agent(
-    agent_id: str,
-    payload: AgentProvisionConfirm,
-    session: Session = Depends(get_session),
-) -> dict[str, bool]:
-    agent = session.get(Agent, agent_id)
-    if agent is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    if not agent.provision_confirm_token_hash:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Provisioning confirmation not requested.",
-        )
-    if not verify_agent_token(payload.token, agent.provision_confirm_token_hash):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid token.")
-    if agent.board_id is None:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
-    board = _require_board(session, str(agent.board_id))
-    _, client_config = _require_gateway(session, board)
-
-    action = payload.action or agent.provision_action or "provision"
-    verb = "updated" if action == "update" else "provisioned"
-
+    # Always ask the main agent to confirm workspace cleanup.
     try:
-        import asyncio
+        main_session = gateway.main_session_key
+        if main_session and workspace_path:
+            cleanup_message = (
+                "Cleanup request for deleted agent.\n\n"
+                f"Agent name: {agent.name}\n"
+                f"Agent id: {agent.id}\n"
+                f"Workspace path: {workspace_path}\n\n"
+                "Actions:\n"
+                "1) Remove the workspace directory.\n"
+                "2) Reply NO_REPLY.\n"
+            )
 
-        asyncio.run(_send_wakeup_message(agent, client_config, verb=verb))
-    except OpenClawGatewayError as exc:
-        _record_wakeup_failure(session, agent, str(exc))
-        session.commit()
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Wakeup message failed: {exc}",
-        ) from exc
+            async def _request_cleanup() -> None:
+                await ensure_session(main_session, config=client_config, label="Main Agent")
+                await send_message(
+                    cleanup_message,
+                    session_key=main_session,
+                    config=client_config,
+                    deliver=False,
+                )
 
-    agent.provision_confirm_token_hash = None
-    agent.provision_requested_at = None
-    agent.provision_action = None
-    if action == "update":
-        agent.status = "online"
-    agent.updated_at = datetime.utcnow()
-    session.add(agent)
-    record_activity(
-        session,
-        event_type=f"agent.{action}.confirmed",
-        message=f"{action.capitalize()} confirmed for {agent.name}.",
-        agent_id=agent.id,
-    )
-    record_activity(
-        session,
-        event_type="agent.wakeup.sent",
-        message=f"Wakeup message sent to {agent.name}.",
-        agent_id=agent.id,
-    )
-    session.commit()
-    return {"ok": True}
+            import asyncio
 
-
-@router.post("/{agent_id}/delete/confirm")
-def confirm_delete_agent(
-    agent_id: str,
-    payload: AgentDeleteConfirm,
-    session: Session = Depends(get_session),
-) -> dict[str, bool]:
-    agent = session.get(Agent, agent_id)
-    if agent is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    if agent.status != "deleting":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Agent is not pending deletion.",
-        )
-    if not agent.delete_confirm_token_hash:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Delete confirmation not requested.",
-        )
-    if not verify_agent_token(payload.token, agent.delete_confirm_token_hash):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid token.")
-
-    record_activity(
-        session,
-        event_type="agent.delete.confirmed",
-        message=f"Deleted agent {agent.name}.",
-        agent_id=None,
-    )
-    session.execute(
-        update(ActivityEvent).where(col(ActivityEvent.agent_id) == agent.id).values(agent_id=None)
-    )
-    session.delete(agent)
-    session.commit()
+            asyncio.run(_request_cleanup())
+    except Exception:
+        # Cleanup request is best-effort; deletion already completed.
+        pass
     return {"ok": True}

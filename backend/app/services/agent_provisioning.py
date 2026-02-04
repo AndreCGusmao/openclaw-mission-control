@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -76,16 +75,6 @@ def _workspace_path(agent_name: str, workspace_root: str) -> str:
     root = workspace_root
     root = root.rstrip("/")
     return f"{root}/workspace-{_slugify(agent_name)}"
-
-
-def _resolve_workspace_dir(workspace_root: str, agent_name: str) -> Path:
-    if not workspace_root:
-        raise ValueError("gateway_workspace_root is required")
-    root = Path(workspace_root).expanduser().resolve()
-    workspace = Path(_workspace_path(agent_name, workspace_root)).expanduser().resolve()
-    if workspace == root or root not in workspace.parents:
-        raise ValueError("workspace path is not under workspace root")
-    return workspace
 
 
 def _build_context(
@@ -268,6 +257,26 @@ async def _remove_gateway_agent_list(
     await openclaw_call("config.patch", params, config=config)
 
 
+async def _get_gateway_agent_entry(
+    agent_id: str,
+    config: GatewayClientConfig,
+) -> dict[str, Any] | None:
+    cfg = await openclaw_call("config.get", config=config)
+    if not isinstance(cfg, dict):
+        return None
+    data = cfg.get("config") or cfg.get("parsed") or {}
+    if not isinstance(data, dict):
+        return None
+    agents = data.get("agents") or {}
+    lst = agents.get("list") or []
+    if not isinstance(lst, list):
+        return None
+    for entry in lst:
+        if isinstance(entry, dict) and entry.get("id") == agent_id:
+            return entry
+    return None
+
+
 async def provision_agent(
     agent: Agent,
     board: Board,
@@ -318,12 +327,10 @@ async def provision_agent(
         )
 
 
-async def cleanup_agent_direct(
+async def cleanup_agent(
     agent: Agent,
     gateway: Gateway,
-    *,
-    delete_workspace: bool = True,
-) -> None:
+) -> str | None:
     if not gateway.url:
         return
     if not gateway.workspace_root:
@@ -331,13 +338,13 @@ async def cleanup_agent_direct(
     client_config = GatewayClientConfig(url=gateway.url, token=gateway.token)
 
     agent_id = _agent_key(agent)
+    entry = await _get_gateway_agent_entry(agent_id, client_config)
     await _remove_gateway_agent_list(agent_id, client_config)
 
     session_key = _session_key(agent)
     await openclaw_call("sessions.delete", {"key": session_key}, config=client_config)
 
-    if delete_workspace:
-        workspace_dir = _resolve_workspace_dir(gateway.workspace_root, agent.name)
-        if workspace_dir.exists():
-            shutil.rmtree(workspace_dir)
-
+    workspace_path = entry.get("workspace") if entry else None
+    if not workspace_path:
+        workspace_path = _workspace_path(agent.name, gateway.workspace_root)
+    return workspace_path

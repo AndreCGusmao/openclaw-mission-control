@@ -45,11 +45,3 @@ class AgentHeartbeatCreate(AgentHeartbeat):
     name: str
     board_id: UUID | None = None
 
-
-class AgentDeleteConfirm(SQLModel):
-    token: str
-
-
-class AgentProvisionConfirm(SQLModel):
-    token: str
-    action: str | None = None
