@@ -130,6 +130,9 @@ export default function BoardDetailPage() {
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [isCommentsLoading, setIsCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [newComment, setNewComment] = useState("");
+  const [isPostingComment, setIsPostingComment] = useState(false);
+  const [postCommentError, setPostCommentError] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const tasksRef = useRef<Task[]>([]);
   const approvalsRef = useRef<Approval[]>([]);
@@ -777,7 +780,46 @@ export default function BoardDetailPage() {
     setSelectedTask(null);
     setComments([]);
     setCommentsError(null);
+    setNewComment("");
+    setPostCommentError(null);
     setIsEditDialogOpen(false);
+  };
+
+  const handlePostComment = async () => {
+    if (!selectedTask || !boardId || !isSignedIn) return;
+    const trimmed = newComment.trim();
+    if (!trimmed) {
+      setPostCommentError("Write a message before sending.");
+      return;
+    }
+    setIsPostingComment(true);
+    setPostCommentError(null);
+    try {
+      const token = await getToken();
+      const response = await fetch(
+        `${apiBase}/api/v1/boards/${boardId}/tasks/${selectedTask.id}/comments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : "",
+          },
+          body: JSON.stringify({ message: trimmed }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error("Unable to send message.");
+      }
+      const created = (await response.json()) as TaskComment;
+      setComments((prev) => [created, ...prev]);
+      setNewComment("");
+    } catch (err) {
+      setPostCommentError(
+        err instanceof Error ? err.message : "Unable to send message.",
+      );
+    } finally {
+      setIsPostingComment(false);
+    }
   };
 
   const handleTaskSave = async (closeOnSuccess = false) => {
@@ -1489,6 +1531,26 @@ export default function BoardDetailPage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Comments
               </p>
+              <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <Textarea
+                  value={newComment}
+                  onChange={(event) => setNewComment(event.target.value)}
+                  placeholder="Write a message for the assigned agent…"
+                  className="min-h-[80px] bg-white"
+                />
+                {postCommentError ? (
+                  <p className="text-xs text-rose-600">{postCommentError}</p>
+                ) : null}
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={handlePostComment}
+                    disabled={isPostingComment || !newComment.trim()}
+                  >
+                    {isPostingComment ? "Sending…" : "Send message"}
+                  </Button>
+                </div>
+              </div>
               {isCommentsLoading ? (
                 <p className="text-sm text-slate-500">Loading comments…</p>
               ) : commentsError ? (

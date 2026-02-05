@@ -277,6 +277,65 @@ def _notify_lead_on_task_create(
         session.commit()
 
 
+def _notify_lead_on_task_unassigned(
+    *,
+    session: Session,
+    board: Board,
+    task: Task,
+) -> None:
+    lead = session.exec(
+        select(Agent)
+        .where(Agent.board_id == board.id)
+        .where(Agent.is_board_lead.is_(True))
+    ).first()
+    if lead is None or not lead.openclaw_session_id:
+        return
+    config = _gateway_config(session, board)
+    if config is None:
+        return
+    description = (task.description or "").strip()
+    if len(description) > 500:
+        description = f"{description[:497]}..."
+    details = [
+        f"Board: {board.name}",
+        f"Task: {task.title}",
+        f"Task ID: {task.id}",
+        f"Status: {task.status}",
+    ]
+    if description:
+        details.append(f"Description: {description}")
+    message = (
+        "TASK BACK IN INBOX\n"
+        + "\n".join(details)
+        + "\n\nTake action: assign a new owner or adjust the plan."
+    )
+    try:
+        asyncio.run(
+            _send_lead_task_message(
+                session_key=lead.openclaw_session_id,
+                config=config,
+                message=message,
+            )
+        )
+        record_activity(
+            session,
+            event_type="task.lead_unassigned_notified",
+            message=f"Lead notified task returned to inbox: {task.title}.",
+            agent_id=lead.id,
+            task_id=task.id,
+        )
+        session.commit()
+    except OpenClawGatewayError as exc:
+        record_activity(
+            session,
+            event_type="task.lead_unassigned_notify_failed",
+            message=f"Lead notify failed: {exc}",
+            agent_id=lead.id,
+            task_id=task.id,
+        )
+        session.commit()
+
+
 @router.get("/stream")
 async def stream_tasks(
     request: Request,
@@ -509,6 +568,15 @@ def update_task(
         agent_id=actor.agent.id if actor.actor_type == "agent" and actor.agent else None,
     )
     session.commit()
+    if task.status == "inbox" and task.assigned_agent_id is None:
+        if previous_status != "inbox" or previous_assigned is not None:
+            board = session.get(Board, task.board_id) if task.board_id else None
+            if board:
+                _notify_lead_on_task_unassigned(
+                    session=session,
+                    board=board,
+                    task=task,
+                )
     if task.assigned_agent_id and task.assigned_agent_id != previous_assigned:
         if (
             actor.actor_type == "agent"
