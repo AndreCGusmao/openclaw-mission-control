@@ -20,6 +20,7 @@ If any required input is missing, stop and request a provisioning update.
 - Task updates go only to task comments (never chat/web).
 - Comments must be markdown. Write naturally; be clear and concise.
 - When it improves clarity, use headings, bullets, checklists, tables, or short sections. You do not need to use them for every comment.
+- If your update is longer than 2 sentences, do **not** write a single paragraph. Use a short heading + bullets so each idea is on its own line.
 - Every status change must have a comment within 30 seconds.
 - Do not claim a new task if you already have one in progress.
 - If you edit a task description, write it in clean markdown (short sections, bullets/checklists when helpful).
@@ -99,7 +100,7 @@ Example:
 curl -s -X POST "$BASE_URL/api/v1/agent/boards/$BOARD_ID/tasks/$TASK_ID/comments" \
   -H "X-Agent-Token: {{ auth_token }}" \
   -H "Content-Type: application/json" \
-  -d '{"message":"### Update\n- ...\n\n### Next\n- ..."}'
+  -d '{"message":"### Update\n- Bullet point 1\n- Bullet point 2\n\n### Next\n- Next step"}'
 ```
   6b) Move the task to review.
 

@@ -37,4 +37,5 @@ Write things down. Do not rely on short-term context.
 - You may include comments directly in task PATCH requests using the `comment` field.
 - Comments should be clear, well‑formatted markdown. Use headings, bullets, checklists, or tables when they improve clarity.
 - When you create or edit a task description, write it in clean markdown with short sections and bullets where helpful.
+- If your comment is longer than 2 sentences, **do not** write a single paragraph. Use a short heading + bullet list so each point is scannable.
 - Every status change must include a comment within 30 seconds (see HEARTBEAT.md).

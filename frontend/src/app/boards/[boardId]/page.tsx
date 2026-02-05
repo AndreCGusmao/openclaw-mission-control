@@ -1695,9 +1695,48 @@ export default function BoardDetailPage() {
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Description
               </p>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
-                {selectedTask?.description || "No description provided."}
-              </p>
+              {selectedTask?.description ? (
+                <div className="prose prose-sm max-w-none text-slate-700">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ ...props }) => (
+                        <p className="mb-3 last:mb-0" {...props} />
+                      ),
+                      ul: ({ ...props }) => (
+                        <ul className="mb-3 list-disc pl-5" {...props} />
+                      ),
+                      ol: ({ ...props }) => (
+                        <ol className="mb-3 list-decimal pl-5" {...props} />
+                      ),
+                      li: ({ ...props }) => (
+                        <li className="mb-1" {...props} />
+                      ),
+                      strong: ({ ...props }) => (
+                        <strong className="font-semibold" {...props} />
+                      ),
+                      h1: ({ ...props }) => (
+                        <h1 className="mb-2 text-base font-semibold" {...props} />
+                      ),
+                      h2: ({ ...props }) => (
+                        <h2 className="mb-2 text-sm font-semibold" {...props} />
+                      ),
+                      h3: ({ ...props }) => (
+                        <h3 className="mb-2 text-sm font-semibold" {...props} />
+                      ),
+                      code: ({ ...props }) => (
+                        <code className="rounded bg-slate-100 px-1 py-0.5 text-xs" {...props} />
+                      ),
+                      pre: ({ ...props }) => (
+                        <pre className="overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100" {...props} />
+                      ),
+                    }}
+                  >
+                    {selectedTask.description}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">No description provided.</p>
+              )}
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
