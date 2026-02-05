@@ -50,6 +50,7 @@ MAIN_TEMPLATE_MAP = {
     "HEARTBEAT.md": "MAIN_HEARTBEAT.md",
     "USER.md": "MAIN_USER.md",
     "BOOT.md": "MAIN_BOOT.md",
+    "TOOLS.md": "MAIN_TOOLS.md",
 }
 
 
