@@ -28,6 +28,7 @@ describe("/activity feed", () => {
       .clear()
       .type("jane+clerk_test@example.com");
 
+<<<<<<< HEAD
     cy.contains('button', /continue|sign in/i).click();
 
     cy.get('input', { timeout: 20_000 })
@@ -40,6 +41,18 @@ describe("/activity feed", () => {
 
     // Back to app
     cy.contains(/live feed/i, { timeout: 30_000 }).should("be.visible");
+=======
+    // OTP / verification code
+    cy.contains(/verification code|code/i).should("be.visible");
+    cy
+      .get('input')
+      .filter('[inputmode="numeric"], [autocomplete="one-time-code"], [type="tel"], [type="text"]')
+      .first()
+      .type("424242");
+
+    cy.contains('button', /verify|continue|sign in/i).click();
+    cy.contains(/live feed/i).should('be.visible');
+>>>>>>> 446cfb2 (E2E: remove Clerk bypass and sign in via Clerk in Cypress)
   }
 
 <<<<<<< HEAD
@@ -81,6 +94,8 @@ describe("/activity feed", () => {
       .filter('[inputmode="numeric"], [autocomplete="one-time-code"], [type="tel"], [type="text"]')
       .first()
       .type("000000");
+
+    cy.contains('button', /verify|continue|sign in/i).click();
 
     // Clerk should display an error message.
     cy.contains(/invalid|incorrect|try again/i).should("be.visible");

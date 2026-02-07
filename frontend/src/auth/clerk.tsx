@@ -1,9 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
-
 // NOTE: We intentionally keep this file very small and dependency-free.
 // It provides CI/secretless-build safe fallbacks for Clerk hooks/components.
+
+import type { ReactNode, ComponentProps } from "react";
 
 import {
   ClerkProvider,
@@ -14,8 +14,6 @@ import {
   useAuth as clerkUseAuth,
   useUser as clerkUseUser,
 } from "@clerk/nextjs";
-
-import type { ComponentProps } from "react";
 
 import { isLikelyValidClerkPublishableKey } from "@/auth/clerkKey";
 
