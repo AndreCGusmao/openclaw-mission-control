@@ -8,7 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 import {
@@ -52,6 +51,11 @@ type Question = {
   question: string;
   options: QuestionOption[];
 };
+
+const FREE_TEXT_OPTION_RE =
+  /(i'?ll type|i will type|type it|type my|other|custom|free\\s*text)/i;
+
+const isFreeTextOption = (label: string) => FREE_TEXT_OPTION_RE.test(label);
 
 const normalizeQuestion = (value: unknown): Question | null => {
   if (!value || typeof value !== "object") return null;
@@ -131,14 +135,19 @@ export function BoardOnboardingChat({
   const draft: BoardOnboardingAgentComplete | null =
     session?.draft_goal ?? null;
 
+  const wantsFreeText = useMemo(
+    () => selectedOptions.some((label) => isFreeTextOption(label)),
+    [selectedOptions],
+  );
+
   useEffect(() => {
     setSelectedOptions([]);
     setOtherText("");
   }, [question?.question]);
 
   useEffect(() => {
-    if (draft) setExtraContextOpen(true);
-  }, [draft]);
+    if (!wantsFreeText) setOtherText("");
+  }, [wantsFreeText]);
 
   const startSession = useCallback(async () => {
     setLoading(true);
@@ -237,11 +246,11 @@ export function BoardOnboardingChat({
 
   const submitAnswer = useCallback(() => {
     const trimmedOther = otherText.trim();
-    if (selectedOptions.length === 0 && !trimmedOther) return;
-    const answer =
-      selectedOptions.length > 0 ? selectedOptions.join(", ") : "Other";
-    void handleAnswer(answer, trimmedOther || undefined);
-  }, [handleAnswer, otherText, selectedOptions]);
+    if (selectedOptions.length === 0) return;
+    if (wantsFreeText && !trimmedOther) return;
+    const answer = selectedOptions.join(", ");
+    void handleAnswer(answer, wantsFreeText ? trimmedOther : undefined);
+  }, [handleAnswer, otherText, selectedOptions, wantsFreeText]);
 
   const confirmGoal = async () => {
     if (!draft) return;
@@ -455,23 +464,34 @@ export function BoardOnboardingChat({
               );
             })}
           </div>
+          {wantsFreeText ? (
+            <div className="space-y-2">
+              <Textarea
+                className="min-h-[84px]"
+                placeholder="Type your answer..."
+                value={otherText}
+                onChange={(event) => setOtherText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (!(event.ctrlKey || event.metaKey)) return;
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  if (loading) return;
+                  submitAnswer();
+                }}
+              />
+              <p className="text-xs text-slate-500">
+                Tip: press Ctrl+Enter (or Cmd+Enter) to send.
+              </p>
+            </div>
+          ) : null}
           <div className="space-y-2">
-            <Input
-              placeholder="Other..."
-              value={otherText}
-              onChange={(event) => setOtherText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
-                if (loading) return;
-                submitAnswer();
-              }}
-            />
             <Button
               variant="outline"
               onClick={submitAnswer}
               disabled={
-                loading || (selectedOptions.length === 0 && !otherText.trim())
+                loading ||
+                selectedOptions.length === 0 ||
+                (wantsFreeText && !otherText.trim())
               }
             >
               {loading ? "Sending..." : "Next"}
@@ -479,58 +499,6 @@ export function BoardOnboardingChat({
             {loading ? (
               <p className="text-xs text-slate-500">Sending your answer…</p>
             ) : null}
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-slate-900">
-                Extra context (optional)
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                onClick={() => setExtraContextOpen((prev) => !prev)}
-                disabled={loading}
-              >
-                {extraContextOpen ? "Hide" : "Add"}
-              </Button>
-            </div>
-            {extraContextOpen ? (
-              <div className="mt-2 space-y-2">
-                <Textarea
-                  className="min-h-[84px]"
-                  placeholder="Anything else that will help the agent plan/act? (constraints, context, preferences, links, etc.)"
-                  value={extraContext}
-                  onChange={(event) => setExtraContext(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (!(event.ctrlKey || event.metaKey)) return;
-                    if (event.key !== "Enter") return;
-                    event.preventDefault();
-                    if (loading) return;
-                    void submitExtraContext();
-                  }}
-                />
-                <div className="flex items-center justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    type="button"
-                    onClick={() => void submitExtraContext()}
-                    disabled={loading || !extraContext.trim()}
-                  >
-                    {loading ? "Sending..." : "Send context"}
-                  </Button>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Tip: press Ctrl+Enter (or Cmd+Enter) to send.
-                </p>
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-slate-600">
-                Add anything that wasn&apos;t covered in the agent&apos;s
-                questions.
-              </p>
-            )}
           </div>
         </div>
       ) : (

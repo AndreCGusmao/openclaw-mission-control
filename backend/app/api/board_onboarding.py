@@ -180,8 +180,12 @@ async def start_onboarding(
         "- 1 question to choose a unique name for the board lead agent (first-name style).\n"
         "- 2-4 questions to capture the user's preferences for how the board lead should work\n"
         "  (communication style, autonomy, update cadence, and output formatting).\n"
-        '- Always include a final question: "Anything else we should know?" (constraints, context,\n'
-        '  preferences). Provide an option like "Yes (I\'ll type it)" so they can fill the free-text field.\n'
+        '- Always include a final question (and only once): "Anything else we should know?"\n'
+        "  (constraints, context, preferences). This MUST be the last question.\n"
+        '  Provide an option like "Yes (I\'ll type it)" so they can enter free-text.\n'
+        "  Do NOT ask for additional context on earlier questions.\n"
+        "  Only include a free-text option on earlier questions if a typed answer is necessary;\n"
+        '  when you do, make the option label include "I\'ll type it" (e.g., "Other (I\'ll type it)").\n'
         '- If the user sends an "Additional context" message later, incorporate it and resend status=complete\n'
         "  to update the draft (until the user confirms).\n"
         "Do NOT respond in OpenClaw chat.\n"
