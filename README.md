@@ -131,6 +131,8 @@ Open http://localhost:3000.
 
 ## Common commands
 
+- Testing notes: [`docs/testing/README.md`](./docs/testing/README.md)
+
 ### Coverage policy
 
 CI enforces a **scoped 100% coverage gate** (statements + branches) for a small set of unit-testable modules.
