@@ -329,6 +329,7 @@ export default function OrganizationPage() {
   const [accessMap, setAccessMap] = useState<BoardAccessState | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [deleteOrgOpen, setDeleteOrgOpen] = useState(false);
+  const [removeMemberOpen, setRemoveMemberOpen] = useState(false);
 
   const orgQuery = useGetMyOrgApiV1OrganizationsMeGet<
     getMyOrgApiV1OrganizationsMeGetResponse,
@@ -557,6 +558,28 @@ export default function OrganizationPage() {
     },
   });
 
+  const removeMemberMutation = useMutation<
+    { data: unknown; status: number; headers: Headers },
+    ApiError,
+    { memberId: string }
+  >({
+    mutationFn: async ({ memberId }) =>
+      customFetch<{ data: unknown; status: number; headers: Headers }>(
+        `/api/v1/organizations/me/members/${memberId}`,
+        { method: "DELETE" },
+      ),
+    onSuccess: async () => {
+      setRemoveMemberOpen(false);
+      setAccessDialogOpen(false);
+      setActiveMemberId(null);
+      await queryClient.invalidateQueries({
+        queryKey: getListOrgMembersApiV1OrganizationsMeMembersGetQueryKey({
+          limit: 200,
+        }),
+      });
+    },
+  });
+
   const resetAccessState = () => {
     setAccessRole(null);
     setAccessScope(null);
@@ -718,6 +741,17 @@ export default function OrganizationPage() {
   const handleDeleteOrganization = () => {
     if (!isOwner) return;
     deleteOrganizationMutation.mutate();
+  };
+
+  const activeMemberCanBeRemoved =
+    isAdmin &&
+    memberDetails !== null &&
+    memberDetails.user_id !== membershipQuery.data?.data.user_id &&
+    (isOwner || memberDetails.role !== "owner");
+
+  const handleRemoveMember = () => {
+    if (!activeMemberId || !activeMemberCanBeRemoved) return;
+    removeMemberMutation.mutate({ memberId: activeMemberId });
   };
 
   const memberAccessSummary = (member: OrganizationMemberRead) =>
@@ -1171,6 +1205,19 @@ export default function OrganizationPage() {
           )}
 
           <DialogFooter className="pt-2">
+            {activeMemberCanBeRemoved ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mr-auto border-rose-200 text-rose-600 hover:border-rose-300 hover:text-rose-700"
+                onClick={() => {
+                  removeMemberMutation.reset();
+                  setRemoveMemberOpen(true);
+                }}
+              >
+                Remove member
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -1183,7 +1230,8 @@ export default function OrganizationPage() {
               onClick={handleSaveAccess}
               disabled={
                 updateMemberAccessMutation.isPending ||
-                updateMemberRoleMutation.isPending
+                updateMemberRoleMutation.isPending ||
+                removeMemberMutation.isPending
               }
             >
               {updateMemberAccessMutation.isPending ||
@@ -1216,6 +1264,34 @@ export default function OrganizationPage() {
         isConfirming={deleteOrganizationMutation.isPending}
         confirmLabel="Delete organization"
         confirmingLabel="Deleting…"
+      />
+      <ConfirmActionDialog
+        open={removeMemberOpen}
+        onOpenChange={(open) => {
+          setRemoveMemberOpen(open);
+          if (!open) {
+            removeMemberMutation.reset();
+          }
+        }}
+        ariaLabel="Remove organization member"
+        title="Remove member"
+        description={
+          <>
+            Remove{" "}
+            <strong>
+              {memberDetails?.user?.name ||
+                memberDetails?.user?.preferred_name ||
+                memberDetails?.user?.email ||
+                "this member"}
+            </strong>{" "}
+            from <strong>{orgName}</strong>? They will lose access immediately.
+          </>
+        }
+        errorMessage={removeMemberMutation.error?.message}
+        onConfirm={handleRemoveMember}
+        isConfirming={removeMemberMutation.isPending}
+        confirmLabel="Remove member"
+        confirmingLabel="Removing…"
       />
     </DashboardShell>
   );

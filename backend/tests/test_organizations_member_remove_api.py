@@ -1,0 +1,178 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from types import SimpleNamespace
+from typing import Any
+from uuid import uuid4
+
+import pytest
+from fastapi import HTTPException, status
+
+from app.api import organizations
+from app.models.organization_members import OrganizationMember
+from app.models.users import User
+
+
+@dataclass
+class _FakeExecResult:
+    first_value: Any = None
+    all_values: list[Any] | None = None
+
+    def first(self) -> Any:
+        return self.first_value
+
+    def __iter__(self):
+        return iter(self.all_values or [])
+
+
+@dataclass
+class _FakeSession:
+    exec_results: list[Any]
+    get_results: dict[tuple[type[Any], Any], Any] = field(default_factory=dict)
+
+    executed: list[Any] = field(default_factory=list)
+    deleted: list[Any] = field(default_factory=list)
+    added: list[Any] = field(default_factory=list)
+    committed: int = 0
+
+    async def exec(self, _statement: Any) -> Any:
+        if not self.exec_results:
+            raise AssertionError("No more exec_results left for session.exec")
+        return self.exec_results.pop(0)
+
+    async def get(self, model: type[Any], key: Any) -> Any:
+        return self.get_results.get((model, key))
+
+    async def execute(self, statement: Any) -> None:
+        self.executed.append(statement)
+
+    async def delete(self, value: Any) -> None:
+        self.deleted.append(value)
+
+    def add(self, value: Any) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        self.committed += 1
+
+
+@pytest.mark.asyncio
+async def test_remove_org_member_deletes_member_access_and_member() -> None:
+    org_id = uuid4()
+    member_id = uuid4()
+    actor_user_id = uuid4()
+    target_user_id = uuid4()
+    fallback_org_id = uuid4()
+    member = OrganizationMember(
+        id=member_id,
+        organization_id=org_id,
+        user_id=target_user_id,
+        role="member",
+    )
+    user = User(
+        id=target_user_id,
+        clerk_user_id="target",
+        active_organization_id=org_id,
+    )
+    session = _FakeSession(
+        exec_results=[_FakeExecResult(first_value=fallback_org_id)],
+        get_results={
+            (OrganizationMember, member_id): member,
+            (User, target_user_id): user,
+        },
+    )
+    ctx = SimpleNamespace(
+        organization=SimpleNamespace(id=org_id),
+        member=SimpleNamespace(user_id=actor_user_id, role="admin"),
+    )
+
+    await organizations.remove_org_member(member_id=member_id, session=session, ctx=ctx)
+
+    executed_tables = [statement.table.name for statement in session.executed]
+    assert executed_tables == ["organization_board_access"]
+    assert session.deleted == [member]
+    assert session.committed == 1
+    assert user.active_organization_id == fallback_org_id
+    assert session.added == [user]
+
+
+@pytest.mark.asyncio
+async def test_remove_org_member_disallows_self_removal() -> None:
+    org_id = uuid4()
+    user_id = uuid4()
+    member = OrganizationMember(
+        id=uuid4(),
+        organization_id=org_id,
+        user_id=user_id,
+        role="member",
+    )
+    session = _FakeSession(
+        exec_results=[],
+        get_results={(OrganizationMember, member.id): member},
+    )
+    ctx = SimpleNamespace(
+        organization=SimpleNamespace(id=org_id),
+        member=SimpleNamespace(user_id=user_id, role="owner"),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await organizations.remove_org_member(member_id=member.id, session=session, ctx=ctx)
+
+    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+    assert session.executed == []
+    assert session.deleted == []
+    assert session.committed == 0
+
+
+@pytest.mark.asyncio
+async def test_remove_org_member_requires_owner_to_remove_owner() -> None:
+    org_id = uuid4()
+    member = OrganizationMember(
+        id=uuid4(),
+        organization_id=org_id,
+        user_id=uuid4(),
+        role="owner",
+    )
+    session = _FakeSession(
+        exec_results=[],
+        get_results={(OrganizationMember, member.id): member},
+    )
+    ctx = SimpleNamespace(
+        organization=SimpleNamespace(id=org_id),
+        member=SimpleNamespace(user_id=uuid4(), role="admin"),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await organizations.remove_org_member(member_id=member.id, session=session, ctx=ctx)
+
+    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+    assert session.executed == []
+    assert session.deleted == []
+    assert session.committed == 0
+
+
+@pytest.mark.asyncio
+async def test_remove_org_member_rejects_removing_last_owner() -> None:
+    org_id = uuid4()
+    member = OrganizationMember(
+        id=uuid4(),
+        organization_id=org_id,
+        user_id=uuid4(),
+        role="owner",
+    )
+    session = _FakeSession(
+        exec_results=[_FakeExecResult(all_values=[member.id])],
+        get_results={(OrganizationMember, member.id): member},
+    )
+    ctx = SimpleNamespace(
+        organization=SimpleNamespace(id=org_id),
+        member=SimpleNamespace(user_id=uuid4(), role="owner"),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await organizations.remove_org_member(member_id=member.id, session=session, ctx=ctx)
+
+    assert exc_info.value.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert session.executed == []
+    assert session.deleted == []
+    assert session.committed == 0

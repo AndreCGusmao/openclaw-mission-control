@@ -359,6 +359,64 @@ async def update_member_access(
     return _member_to_read(member, user)
 
 
+@router.delete("/me/members/{member_id}", response_model=OkResponse)
+async def remove_org_member(
+    member_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    ctx: OrganizationContext = Depends(require_org_admin),
+) -> OkResponse:
+    member = await session.get(OrganizationMember, member_id)
+    if member is None or member.organization_id != ctx.organization.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if member.user_id == ctx.member.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You cannot remove yourself from the organization",
+        )
+    if member.role == "owner" and ctx.member.role != "owner":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owners can remove owners",
+        )
+    if member.role == "owner":
+        owner_ids = list(
+            await session.exec(
+                select(OrganizationMember.id).where(
+                    col(OrganizationMember.organization_id) == ctx.organization.id,
+                    col(OrganizationMember.role) == "owner",
+                )
+            )
+        )
+        if len(owner_ids) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Organization must have at least one owner",
+            )
+
+    await session.execute(
+        delete(OrganizationBoardAccess).where(
+            col(OrganizationBoardAccess.organization_member_id) == member.id
+        )
+    )
+
+    user = await session.get(User, member.user_id)
+    if user is not None and user.active_organization_id == ctx.organization.id:
+        fallback_org_id = (
+            await session.exec(
+                select(OrganizationMember.organization_id)
+                .where(col(OrganizationMember.user_id) == user.id)
+                .where(col(OrganizationMember.organization_id) != ctx.organization.id)
+                .order_by(col(OrganizationMember.created_at).asc())
+            )
+        ).first()
+        user.active_organization_id = fallback_org_id
+        session.add(user)
+
+    await session.delete(member)
+    await session.commit()
+    return OkResponse()
+
+
 @router.get("/me/invites", response_model=DefaultLimitOffsetPage[OrganizationInviteRead])
 async def list_org_invites(
     session: AsyncSession = Depends(get_session),
