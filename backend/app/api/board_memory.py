@@ -30,7 +30,10 @@ from app.models.board_memory import BoardMemory
 from app.schemas.board_memory import BoardMemoryCreate, BoardMemoryRead
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.services.mentions import extract_mentions, matches_agent_mention
-from app.services.openclaw import optional_gateway_config_for_board, send_gateway_agent_message
+from app.services.openclaw.shared import (
+    optional_gateway_config_for_board,
+    send_gateway_agent_message,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator

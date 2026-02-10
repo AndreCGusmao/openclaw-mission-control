@@ -24,7 +24,7 @@ from app.schemas.gateway_api import (
     GatewaySessionsResponse,
     GatewaysStatusResponse,
 )
-from app.services.openclaw import GatewaySessionService
+from app.services.openclaw.session_service import GatewaySessionService
 from app.services.organizations import OrganizationContext
 
 if TYPE_CHECKING:

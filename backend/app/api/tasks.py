@@ -43,7 +43,10 @@ from app.schemas.pagination import DefaultLimitOffsetPage
 from app.schemas.tasks import TaskCommentCreate, TaskCommentRead, TaskCreate, TaskRead, TaskUpdate
 from app.services.activity_log import record_activity
 from app.services.mentions import extract_mentions, matches_agent_mention
-from app.services.openclaw import optional_gateway_config_for_board, send_gateway_agent_message
+from app.services.openclaw.shared import (
+    optional_gateway_config_for_board,
+    send_gateway_agent_message,
+)
 from app.services.organizations import require_board_access
 from app.services.task_dependencies import (
     blocked_by_dependency_ids,

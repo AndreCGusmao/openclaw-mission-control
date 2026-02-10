@@ -7,8 +7,8 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.services.openclaw import GatewayAgentIdentity
-from app.services.openclaw import provisioning as agent_provisioning
+import app.services.openclaw.provisioning as agent_provisioning
+from app.services.openclaw.shared import GatewayAgentIdentity
 
 
 def test_slugify_normalizes_and_trims():

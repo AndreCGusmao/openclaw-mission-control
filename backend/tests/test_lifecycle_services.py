@@ -11,10 +11,10 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import HTTPException, status
 
+import app.services.openclaw.coordination_service as coordination_lifecycle
+import app.services.openclaw.onboarding_service as onboarding_lifecycle
 from app.integrations.openclaw_gateway import GatewayConfig as GatewayClientConfig
 from app.integrations.openclaw_gateway import OpenClawGatewayError
-from app.services.openclaw import coordination_service as coordination_lifecycle
-from app.services.openclaw import onboarding_service as onboarding_lifecycle
 from app.services.openclaw.shared import GatewayAgentIdentity
 
 

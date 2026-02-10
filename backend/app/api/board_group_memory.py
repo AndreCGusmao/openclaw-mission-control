@@ -34,7 +34,10 @@ from app.models.users import User
 from app.schemas.board_group_memory import BoardGroupMemoryCreate, BoardGroupMemoryRead
 from app.schemas.pagination import DefaultLimitOffsetPage
 from app.services.mentions import extract_mentions, matches_agent_mention
-from app.services.openclaw import optional_gateway_config_for_board, send_gateway_agent_message
+from app.services.openclaw.shared import (
+    optional_gateway_config_for_board,
+    send_gateway_agent_message,
+)
 from app.services.organizations import (
     is_org_admin,
     list_accessible_board_ids,

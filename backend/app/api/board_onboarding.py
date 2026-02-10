@@ -33,13 +33,13 @@ from app.schemas.board_onboarding import (
     BoardOnboardingUserProfile,
 )
 from app.schemas.boards import BoardRead
-from app.services.openclaw import (
-    BoardOnboardingMessagingService,
+from app.services.openclaw.onboarding_service import BoardOnboardingMessagingService
+from app.services.openclaw.provisioning import (
     LeadAgentOptions,
     LeadAgentRequest,
     ensure_board_lead_agent,
-    require_gateway_config_for_board,
 )
+from app.services.openclaw.shared import require_gateway_config_for_board
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
