@@ -37,6 +37,15 @@ if TYPE_CHECKING:
     from app.models.boards import Board
 
 
+def _is_missing_gateway_agent_error(exc: OpenClawGatewayError) -> bool:
+    message = str(exc).lower()
+    if not message:
+        return False
+    if any(marker in message for marker in ("unknown agent", "no such agent", "agent does not exist")):
+        return True
+    return "agent" in message and "not found" in message
+
+
 async def delete_board(session: AsyncSession, *, board: Board) -> OkResponse:
     """Delete a board and all dependent records, cleaning gateway state when configured."""
     agents = await Agent.objects.filter_by(board_id=board.id).all(session)
@@ -46,17 +55,19 @@ async def delete_board(session: AsyncSession, *, board: Board) -> OkResponse:
         gateway = await require_gateway_for_board(session, board, require_workspace_root=True)
         # Ensure URL is present (required for gateway cleanup calls).
         gateway_client_config(gateway)
-        try:
-            for agent in agents:
+        for agent in agents:
+            try:
                 await OpenClawGatewayProvisioner().delete_agent_lifecycle(
                     agent=agent,
                     gateway=gateway,
                 )
-        except OpenClawGatewayError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Gateway cleanup failed: {exc}",
-            ) from exc
+            except OpenClawGatewayError as exc:
+                if _is_missing_gateway_agent_error(exc):
+                    continue
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Gateway cleanup failed: {exc}",
+                ) from exc
 
     if task_ids:
         await crud.delete_where(
