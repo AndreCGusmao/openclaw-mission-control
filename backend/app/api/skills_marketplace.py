@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 from uuid import UUID
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import col
 
@@ -49,6 +51,7 @@ GATEWAY_ID_QUERY = Query(...)
 ALLOWED_PACK_SOURCE_SCHEMES = {"https"}
 GIT_CLONE_TIMEOUT_SECONDS = 30
 GIT_REV_PARSE_TIMEOUT_SECONDS = 10
+BRANCH_NAME_ALLOWED_RE = r"^[A-Za-z0-9._/\-]+$"
 
 
 @dataclass(frozen=True)
@@ -411,6 +414,9 @@ def _collect_pack_skills(source_url: str) -> list[PackSkillCandidate]:
         branch = branch or "main"
         # Fail closed on weird output to avoid constructing malformed URLs.
         if any(ch in branch for ch in {"\n", "\r", "\t"}):
+            branch = "main"
+
+        if not re.match(BRANCH_NAME_ALLOWED_RE, branch):
             branch = "main"
 
         return _collect_pack_skills_from_repo(
