@@ -80,7 +80,10 @@ function riskBadgeLabel(risk: string | null | undefined) {
 
 type MarketplaceSkillsTableProps = {
   skills: MarketplaceSkillCardRead[];
-  installedGatewayNamesBySkillId?: Record<string, { id: string; name: string }[]>;
+  installedGatewayNamesBySkillId?: Record<
+    string,
+    { id: string; name: string }[]
+  >;
   isLoading?: boolean;
   sorting?: SortingState;
   onSortingChange?: OnChangeFn<SortingState>;

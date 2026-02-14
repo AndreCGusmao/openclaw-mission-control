@@ -717,7 +717,7 @@ def _as_card(
     skill: MarketplaceSkill,
     installation: GatewayInstalledSkill | None,
 ) -> MarketplaceSkillCardRead:
-    card_source = skill.source_url
+    card_source: str | None = skill.source_url
     if not card_source:
         card_source = skill.source
 
@@ -966,8 +966,7 @@ async def list_marketplace_skills(
             )
         else:
             skills_query = skills_query.filter(
-                func.lower(func.trim(col(MarketplaceSkill.category)))
-                == normalized_category,
+                func.lower(func.trim(col(MarketplaceSkill.category))) == normalized_category,
             )
 
     normalized_risk = (risk or "").strip().lower()

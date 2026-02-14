@@ -177,7 +177,9 @@ export default function SkillsMarketplacePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>(
     initialCategory || "all",
   );
-  const [selectedRisk, setSelectedRisk] = useState<string>(initialRisk || "safe");
+  const [selectedRisk, setSelectedRisk] = useState<string>(
+    initialRisk || "safe",
+  );
   const [currentPage, setCurrentPage] = useState(initialPage);
   const [pageSize, setPageSize] = useState(initialPageSize);
 
@@ -261,34 +263,29 @@ export default function SkillsMarketplacePage() {
   const skillsQuery = useListMarketplaceSkillsApiV1SkillsMarketplaceGet<
     listMarketplaceSkillsApiV1SkillsMarketplaceGetResponse,
     ApiError
-  >(
-    skillsParams,
-    {
-      query: {
-        enabled: Boolean(isSignedIn && isAdmin && resolvedGatewayId),
-        refetchOnMount: "always",
-        refetchInterval: 15_000,
-      },
+  >(skillsParams, {
+    query: {
+      enabled: Boolean(isSignedIn && isAdmin && resolvedGatewayId),
+      refetchOnMount: "always",
+      refetchInterval: 15_000,
     },
-  );
+  });
 
   const skills = useMemo<MarketplaceSkillCardRead[]>(
     () => (skillsQuery.data?.status === 200 ? skillsQuery.data.data : []),
     [skillsQuery.data],
   );
-  const filterOptionSkillsQuery = useListMarketplaceSkillsApiV1SkillsMarketplaceGet<
-    listMarketplaceSkillsApiV1SkillsMarketplaceGetResponse,
-    ApiError
-  >(
-    filterOptionsParams,
-    {
+  const filterOptionSkillsQuery =
+    useListMarketplaceSkillsApiV1SkillsMarketplaceGet<
+      listMarketplaceSkillsApiV1SkillsMarketplaceGetResponse,
+      ApiError
+    >(filterOptionsParams, {
       query: {
         enabled: Boolean(isSignedIn && isAdmin && resolvedGatewayId),
         refetchOnMount: "always",
         refetchInterval: 15_000,
       },
-    },
-  );
+    });
   const filterOptionSkills = useMemo<MarketplaceSkillCardRead[]>(
     () =>
       filterOptionSkillsQuery.data?.status === 200
@@ -322,7 +319,10 @@ export default function SkillsMarketplacePage() {
       return { hasKnownTotal: false, total: skills.length };
     }
     const totalCountHeader = skillsQuery.data.headers.get("x-total-count");
-    if (typeof totalCountHeader === "string" && totalCountHeader.trim() !== "") {
+    if (
+      typeof totalCountHeader === "string" &&
+      totalCountHeader.trim() !== ""
+    ) {
       const parsed = Number(totalCountHeader);
       if (Number.isFinite(parsed) && parsed >= 0) {
         return { hasKnownTotal: true, total: parsed };
@@ -345,13 +345,16 @@ export default function SkillsMarketplacePage() {
       return currentPage < totalPages;
     }
     return skills.length === pageSize;
-  }, [currentPage, pageSize, skills.length, totalCountInfo.hasKnownTotal, totalPages]);
-  const rangeStart =
-    totalSkills === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  }, [
+    currentPage,
+    pageSize,
+    skills.length,
+    totalCountInfo.hasKnownTotal,
+    totalPages,
+  ]);
+  const rangeStart = totalSkills === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const rangeEnd =
-    totalSkills === 0
-      ? 0
-      : (currentPage - 1) * pageSize + skills.length;
+    totalSkills === 0 ? 0 : (currentPage - 1) * pageSize + skills.length;
 
   const categoryFilterOptions = useMemo(() => {
     const byValue = new Map<string, string>();
@@ -819,7 +822,10 @@ export default function SkillsMarketplacePage() {
                       <SelectContent>
                         <SelectItem value="all">All categories</SelectItem>
                         {categoryFilterOptions.map((category) => (
-                          <SelectItem key={category.value} value={category.value}>
+                          <SelectItem
+                            key={category.value}
+                            value={category.value}
+                          >
                             {category.label}
                           </SelectItem>
                         ))}
@@ -833,7 +839,10 @@ export default function SkillsMarketplacePage() {
                     >
                       Risk
                     </label>
-                    <Select value={selectedRisk} onValueChange={setSelectedRisk}>
+                    <Select
+                      value={selectedRisk}
+                      onValueChange={setSelectedRisk}
+                    >
                       <SelectTrigger
                         id="marketplace-risk-filter"
                         className="h-11"
@@ -917,7 +926,9 @@ export default function SkillsMarketplacePage() {
                     variant="ghost"
                     size="sm"
                     disabled={currentPage <= 1 || skillsQuery.isLoading}
-                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(1, prev - 1))
+                    }
                   >
                     Previous
                   </Button>
