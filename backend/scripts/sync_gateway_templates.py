@@ -24,6 +24,12 @@ def _parse_args() -> argparse.Namespace:
         help="Optional Board UUID filter",
     )
     parser.add_argument(
+        "--user-id",
+        type=str,
+        default=None,
+        help="Optional User UUID for USER.md rendering context",
+    )
+    parser.add_argument(
         "--include-main",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -62,6 +68,7 @@ def _parse_args() -> argparse.Namespace:
 async def _run() -> int:
     from app.db.session import async_session_maker
     from app.models.gateways import Gateway
+    from app.models.users import User
     from app.services.openclaw.provisioning_db import (
         GatewayTemplateSyncOptions,
         OpenClawProvisioningService,
@@ -70,17 +77,22 @@ async def _run() -> int:
     args = _parse_args()
     gateway_id = UUID(args.gateway_id)
     board_id = UUID(args.board_id) if args.board_id else None
+    user_id = UUID(args.user_id) if args.user_id else None
 
     async with async_session_maker() as session:
         gateway = await session.get(Gateway, gateway_id)
         if gateway is None:
             message = f"Gateway not found: {gateway_id}"
             raise SystemExit(message)
+        template_user = await session.get(User, user_id) if user_id else None
+        if user_id and template_user is None:
+            message = f"User not found: {user_id}"
+            raise SystemExit(message)
 
         result = await OpenClawProvisioningService(session).sync_gateway_templates(
             gateway,
             GatewayTemplateSyncOptions(
-                user=None,
+                user=template_user,
                 include_main=bool(args.include_main),
                 lead_only=bool(args.lead_only),
                 reset_sessions=bool(args.reset_sessions),

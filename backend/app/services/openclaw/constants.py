@@ -93,10 +93,12 @@ _SESSION_KEY_PARTS_MIN = SESSION_KEY_PARTS_MIN
 
 MAIN_TEMPLATE_MAP = {
     "AGENTS.md": "BOARD_AGENTS.md.j2",
+    "IDENTITY.md": "BOARD_IDENTITY.md.j2",
     "SOUL.md": "BOARD_SOUL.md.j2",
+    "MEMORY.md": "BOARD_MEMORY.md.j2",
     "HEARTBEAT.md": "BOARD_HEARTBEAT.md.j2",
-    "USER.md": "MAIN_USER.md",
-    "TOOLS.md": "MAIN_TOOLS.md",
+    "USER.md": "BOARD_USER.md.j2",
+    "TOOLS.md": "BOARD_TOOLS.md.j2",
 }
 
 BOARD_SHARED_TEMPLATE_MAP = {

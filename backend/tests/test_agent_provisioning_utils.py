@@ -70,6 +70,40 @@ def test_templates_root_points_to_repo_templates_dir():
     assert (root / "BOARD_AGENTS.md.j2").exists()
 
 
+def test_user_context_uses_email_fallback_when_name_is_missing():
+    user = SimpleNamespace(
+        name=None,
+        preferred_name=None,
+        pronouns=None,
+        timezone=None,
+        notes=None,
+        context=None,
+        email="jane.doe@example.com",
+    )
+
+    context = agent_provisioning._user_context(user)
+
+    assert context["user_name"] == "jane.doe@example.com"
+    assert context["user_preferred_name"] == "jane.doe"
+
+
+def test_user_context_prefers_name_token_when_preferred_name_missing():
+    user = SimpleNamespace(
+        name="Jane Doe",
+        preferred_name=None,
+        pronouns=None,
+        timezone=None,
+        notes=None,
+        context=None,
+        email=None,
+    )
+
+    context = agent_provisioning._user_context(user)
+
+    assert context["user_name"] == "Jane Doe"
+    assert context["user_preferred_name"] == "Jane"
+
+
 @dataclass
 class _GatewayStub:
     id: UUID

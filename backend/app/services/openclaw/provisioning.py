@@ -161,16 +161,41 @@ def _workspace_path(agent: Agent, workspace_root: str) -> str:
     return f"{root}/workspace-{slugify(key)}"
 
 
+def _email_local_part(email: str) -> str:
+    normalized = email.strip()
+    if not normalized:
+        return ""
+    local, _sep, _domain = normalized.partition("@")
+    return local.strip() or normalized
+
+
+def _display_name(user: User | None) -> str:
+    if user is None:
+        return ""
+    name = (user.name or "").strip()
+    if name:
+        return name
+    return (user.email or "").strip()
+
+
 def _preferred_name(user: User | None) -> str:
     preferred_name = (user.preferred_name or "") if user else ""
     if preferred_name:
         preferred_name = preferred_name.strip().split()[0]
-    return preferred_name
+    if preferred_name:
+        return preferred_name
+    display_name = _display_name(user)
+    if display_name:
+        if "@" in display_name:
+            return _email_local_part(display_name)
+        return display_name.split()[0]
+    email = (user.email or "") if user else ""
+    return _email_local_part(email)
 
 
 def _user_context(user: User | None) -> dict[str, str]:
     return {
-        "user_name": (user.name or "") if user else "",
+        "user_name": _display_name(user),
         "user_preferred_name": _preferred_name(user),
         "user_pronouns": (user.pronouns or "") if user else "",
         "user_timezone": (user.timezone or "") if user else "",

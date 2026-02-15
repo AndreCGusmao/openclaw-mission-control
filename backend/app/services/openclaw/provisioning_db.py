@@ -252,8 +252,24 @@ class OpenClawProvisioningService(OpenClawDBService):
                 reset_sessions=options.reset_sessions,
                 rotate_tokens=options.rotate_tokens,
                 force_bootstrap=options.force_bootstrap,
+                overwrite=options.overwrite,
                 board_id=options.board_id,
             )
+
+        if template_user is None:
+            result = _base_result(
+                gateway,
+                include_main=options.include_main,
+                reset_sessions=options.reset_sessions,
+            )
+            _append_sync_error(
+                result,
+                message=(
+                    "Organization owner not found (required for gateway template USER.md "
+                    "rendering)."
+                ),
+            )
+            return result
 
         result = _base_result(
             gateway,
