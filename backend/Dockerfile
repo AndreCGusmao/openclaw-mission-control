@@ -40,7 +40,7 @@ COPY backend/app ./app
 
 # Copy provisioning templates.
 # In-repo these live at `backend/templates/`; runtime path is `/app/templates`.
-COPY backend/templates ./templates
+COPY templates ./templates
 
 # Default API port
 EXPOSE 8000
